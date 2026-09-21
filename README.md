@@ -21,9 +21,26 @@ BLE** from Settings → Devices & services.
 The strip advertises as `Govee_H617A_XXXX`. The Home Assistant Bluetooth adapter
 or Bluetooth proxy must support active connections to it.
 
-This first version reports the state it last successfully sent. A state refresh
-after a Home Assistant restart, physical-button changes, transitions, native
-scenes, and individual segments are planned follow-up work.
+## Find the Bluetooth address
+
+Automatic discovery should offer the strip when Home Assistant sees its
+`Govee_H617A_XXXX` advertisement. If you add the integration manually, enter the
+strip's current Bluetooth address:
+
+1. Power on the strip.
+2. In Home Assistant, open **Settings → Devices & services → Bluetooth**.
+3. Open **Advertisements**, search for `Govee_H617A`, and copy its address.
+4. Add **Govee H617A BLE** and paste that address when prompted.
+
+Do not copy the address from an example or another installation; it belongs to
+one physical strip. If the strip is absent from Advertisements, move it closer
+to the Home Assistant Bluetooth adapter and power-cycle it, then wait a few
+seconds for a new advertisement.
+
+This version queries power state when it starts. RGB colour and brightness show
+the last values successfully sent by Home Assistant. Continuous state updates
+for physical-button changes, transitions, native scenes, and individual segments
+are planned follow-up work.
 
 ## Protocol evidence
 
