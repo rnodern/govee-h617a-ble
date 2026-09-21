@@ -1,0 +1,20 @@
+{
+  "config": {
+    "abort": {
+      "not_connectable": "This Bluetooth adapter cannot connect to the strip."
+    },
+    "step": {
+      "user": {
+        "title": "Set up Govee H617A BLE",
+        "description": "Enter the strip's Bluetooth address, for example C8:34:30:35:6B:4A.",
+        "data": {
+          "address": "Bluetooth address"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Set up Govee H617A BLE",
+        "description": "Do you want to add {name}?"
+      }
+    }
+  }
+}

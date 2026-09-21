@@ -1,0 +1,18 @@
+{
+  "domain": "govee_h617a_ble",
+  "name": "Govee H617A BLE",
+  "codeowners": ["@rnodern"],
+  "bluetooth": [
+    {
+      "local_name": "Govee_H617A_*"
+    }
+  ],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/rnodern/govee-h617a-ble",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/rnodern/govee-h617a-ble/issues",
+  "requirements": ["bleak-retry-connector>=3.12.0"],
+  "version": "0.1.0"
+}

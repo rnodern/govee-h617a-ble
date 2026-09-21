@@ -1,0 +1,94 @@
+[
+  {
+    "name": "rgb_255_0_0",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 1223,
+    "payload_hex": "33051501ff00000000000000ff7f00000000005d",
+    "expected": {
+      "rgb": [
+        255,
+        0,
+        0
+      ],
+      "segment_mask_hex": "ff7f"
+    }
+  },
+  {
+    "name": "rgb_0_255_0",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 3515,
+    "payload_hex": "3305150100ff000000000000ff7f00000000005d",
+    "expected": {
+      "rgb": [
+        0,
+        255,
+        0
+      ],
+      "segment_mask_hex": "ff7f"
+    }
+  },
+  {
+    "name": "rgb_0_0_255",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 3862,
+    "payload_hex": "330515010000ff0000000000ff7f00000000005d",
+    "expected": {
+      "rgb": [
+        0,
+        0,
+        255
+      ],
+      "segment_mask_hex": "ff7f"
+    }
+  },
+  {
+    "name": "rgb_255_255_255",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 4204,
+    "payload_hex": "33051501ffffff0000000000ff7f00000000005d",
+    "expected": {
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "segment_mask_hex": "ff7f"
+    }
+  },
+  {
+    "name": "brightness_50",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 7164,
+    "payload_hex": "3304320000000000000000000000000000000005",
+    "expected": {
+      "brightness_percent": 50
+    }
+  },
+  {
+    "name": "brightness_25",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 7597,
+    "payload_hex": "330419000000000000000000000000000000002e",
+    "expected": {
+      "brightness_percent": 25
+    }
+  },
+  {
+    "name": "brightness_1",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 7897,
+    "payload_hex": "3304010000000000000000000000000000000036",
+    "expected": {
+      "brightness_percent": 1
+    }
+  },
+  {
+    "name": "brightness_100",
+    "source_capture": "h617a-color-check-02.pcap",
+    "source_frame": 8254,
+    "payload_hex": "3304640000000000000000000000000000000053",
+    "expected": {
+      "brightness_percent": 100
+    }
+  }
+]
