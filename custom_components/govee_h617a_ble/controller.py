@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from bleak.backends.device import BLEDevice
+from bleak.exc import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
@@ -37,13 +38,16 @@ class GoveeH617AController:
                 f"H617A {self.address} is not currently visible to a Home Assistant "
                 "Bluetooth adapter"
             )
-        return await establish_connection(
-            BleakClientWithServiceCache,
-            device,
-            device.name or f"H617A {self.address}",
-            max_attempts=3,
-            ble_device_callback=self._ble_device,
-        )
+        try:
+            return await establish_connection(
+                BleakClientWithServiceCache,
+                device,
+                device.name or f"H617A {self.address}",
+                max_attempts=3,
+                ble_device_callback=lambda: self._ble_device() or device,
+            )
+        except (BleakError, TimeoutError, OSError) as err:
+            raise ConnectionError(f"Could not connect to H617A {self.address}: {err}") from err
 
     async def async_write_frames(self, frames: tuple[bytes, ...]) -> None:
         """Connect once, write ordered frames, then disconnect.
@@ -52,17 +56,20 @@ class GoveeH617AController:
         together.  Keeping those writes in one BLE connection avoids a slow
         reconnect for each property.
         """
+        if not frames:
+            return
         async with self._lock:
             client = await self._async_connect()
             try:
-                for index, frame in enumerate(frames):
+                for frame in frames:
                     await client.write_gatt_char(
                         CONTROL_CHARACTERISTIC_UUID, frame, response=False
                     )
-                    if index < len(frames) - 1:
-                        # The captured app sends its commands in order; a tiny
-                        # gap prevents a no-response write from being dropped.
-                        await asyncio.sleep(0.05)
+                    # Conservative pacing, including time to drain the final
+                    # no-response write before disconnect. Hardware test pending.
+                    await asyncio.sleep(0.05)
+            except (BleakError, TimeoutError, OSError) as err:
+                raise ConnectionError(f"H617A command failed: {err}") from err
             finally:
                 await client.disconnect()
 
@@ -99,5 +106,7 @@ class GoveeH617AController:
                 )
                 await asyncio.wait_for(response_received.wait(), timeout=1.0)
                 return state
+            except (BleakError, TimeoutError, OSError) as err:
+                raise ConnectionError(f"H617A power query failed: {err}") from err
             finally:
                 await client.disconnect()

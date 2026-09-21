@@ -8,9 +8,38 @@ is required.
 
 ## Current status
 
-The H617A protocol in this project was captured from the iOS Govee app and tested
-for power, whole-strip RGB colour, and 1–100% brightness. Native scenes and
-individual segment control are not included yet.
+The H617A protocol was captured from the iOS Govee app and replayed successfully
+on the development strip. Power, RGB, brightness, and effects work locally;
+state shown after a command is still write-confirmed rather than device readback.
+Individual segment editing is not included.
+
+## Experimental effects
+
+Version 0.3.0 includes 34 captured effects: Sunrise, Sunset, Forest, Aurora,
+Lightning-A, Lightning-B, Starry Sky, Spring, Summer, Fall, Winter, Rainbow,
+Fire, Wave, Deep Sea, Karst Cave, Glacier, Gobi Desert, Moonlight, Flower Field,
+Downpour, Sunny, Volcano-A, Volcano-B, Cornfield, Meteor shower, Flying, Tree
+Shadow, Cherry blossoms, Stream, Ripple, Desert B, Sand Grains, and Aurora B.
+
+Open the light's controls and select an effect from the Effects list.
+Select the `off` effect to return to the last solid colour (white if none is known),
+or send a new RGB colour. The `off` effect stops animation; the power toggle turns
+the light off. The app should be closed during initial testing.
+
+Each scene uploads in one BLE connection. Pending slider changes are coalesced
+and wait for that upload to finish. Brightness is only sent when explicitly
+requested, so selecting Sunrise does not resend a stale brightness setting.
+Brightness adjustment during effects is experimental too.
+
+Effects can also be selected in automations with `light.turn_on`, for example:
+
+```yaml
+action: light.turn_on
+target:
+  entity_id: light.your_h617a
+data:
+  effect: Starry Sky
+```
 
 ## Installation during development
 
@@ -37,10 +66,11 @@ one physical strip. If the strip is absent from Advertisements, move it closer
 to the Home Assistant Bluetooth adapter and power-cycle it, then wait a few
 seconds for a new advertisement.
 
-This version queries power state when it starts. RGB colour and brightness show
-the last values successfully sent by Home Assistant. Continuous state updates
-for physical-button changes, transitions, native scenes, and individual segments
-are planned follow-up work.
+This version queries power state when it starts. Other state represents commands
+successfully written by Home Assistant, not confirmed device readback. Entering
+an effect clears the reported solid colour and brightness rather than displaying
+stale values. Effect identity is unknown after restart. Physical-button/app state
+synchronization, transitions, and individual segments remain future work.
 
 ## Protocol evidence
 
@@ -49,7 +79,7 @@ Git because they include Bluetooth addresses and nearby advertising traffic.
 
 ## Development checks
 
-Run the dependency-free protocol tests:
+Run the protocol tests and command-behaviour tests (fake HA/BLE boundaries):
 
 ```sh
 python3 -m unittest discover -s tests
