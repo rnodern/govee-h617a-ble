@@ -200,7 +200,11 @@ class GoveeH617ALight(LightEntity):
             if ATTR_EFFECT in changes and changes[ATTR_EFFECT] != EFFECT_OFF:
                 effect = changes[ATTR_EFFECT]
                 frames.extend(SCENE_FRAMES[effect])
-                rgb, brightness = None, None
+                # The scene upload does not report a brightness value back to
+                # Home Assistant. Preserve the last known value so HA does not
+                # render the effect slider at its minimum; use full brightness
+                # until the user has chosen one.
+                rgb, brightness = None, brightness if brightness is not None else 255
             elif ATTR_RGB_COLOR in changes or changes.get(ATTR_EFFECT) == EFFECT_OFF:
                 rgb = tuple(changes.get(ATTR_RGB_COLOR, self._last_solid_rgb))
                 frames.append(whole_strip_color_frame(*rgb))

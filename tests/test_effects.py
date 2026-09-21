@@ -133,8 +133,13 @@ class BehaviourTest(unittest.IsolatedAsyncioTestCase):
         await self.light.async_turn_on(effect='Starry Sky', rgb_color=(255,0,0))
         self.assertEqual(self.calls[-1], scenes['Starry Sky'])
         self.assertEqual(self.light.effect, 'Starry Sky')
-        self.assertIsNone(self.light.brightness)
+        self.assertEqual(self.light.brightness, 50)
         self.assertIsNone(self.light.rgb_color)
+
+    async def test_effect_without_known_brightness_shows_full_slider(self):
+        self.light._brightness = None
+        await self.light.async_turn_on(effect='Fire')
+        self.assertEqual(self.light.brightness, 255)
 
     async def test_same_colour_exits_scene(self):
         await self.light.async_turn_on(rgb_color=(255,0,0))
