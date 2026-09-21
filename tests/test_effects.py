@@ -191,6 +191,15 @@ class BehaviourTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError): await self.light.async_turn_on(effect='Unknown')
         self.assertEqual(self.calls, [])
 
+    async def test_unavailable_startup_schedules_backoff_retry(self):
+        self.controller.async_get_power_state.return_value = None
+        await self.light.async_added_to_hass()
+        await self.light._startup_task
+        self.assertFalse(self.light._attr_available)
+        self.assertIsNotNone(self.light._retry_task)
+        self.assertFalse(self.light._retry_task.done())
+        await self.light.async_will_remove_from_hass()
+
     async def test_unload_cancels_active_upload(self):
         entered = asyncio.Event()
         async def wait_forever(frames):

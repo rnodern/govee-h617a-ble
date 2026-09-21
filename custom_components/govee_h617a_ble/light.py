@@ -35,6 +35,8 @@ class GoveeH617ALight(LightEntity):
     _attr_effect_list = [EFFECT_OFF, *SCENE_FRAMES]
     _attr_should_poll = False
     _COMMAND_DEBOUNCE_SECONDS = 0.25
+    _AVAILABILITY_RETRY_INITIAL_SECONDS = 15
+    _AVAILABILITY_RETRY_MAX_SECONDS = 300
 
     def __init__(self, entry: ConfigEntry, controller: GoveeH617AController) -> None:
         self._controller = controller
@@ -47,6 +49,7 @@ class GoveeH617ALight(LightEntity):
         self._waiters: list[asyncio.Future[None]] = []
         self._command_task: asyncio.Task | None = None
         self._startup_task: asyncio.Task | None = None
+        self._retry_task: asyncio.Task | None = None
         self._removing = False
         self._attr_available = False
         self._attr_unique_id = entry.data[CONF_ADDRESS].replace(":", "").lower()
@@ -88,12 +91,35 @@ class GoveeH617ALight(LightEntity):
         except Exception:
             _LOGGER.warning("Could not read H617A initial power state", exc_info=True)
             self._attr_available = False
+        if not self._attr_available:
+            self._async_schedule_availability_retry()
         if not self._removing:
             self.async_write_ha_state()
 
+    def _async_schedule_availability_retry(self) -> None:
+        """Retry a failed probe without repeatedly competing for BLE."""
+        if self._removing or (self._retry_task and not self._retry_task.done()):
+            return
+        self._retry_task = self.hass.async_create_task(
+            self._async_retry_until_available()
+        )
+
+    async def _async_retry_until_available(self) -> None:
+        """Recover after an occupied strip/app connection with bounded backoff."""
+        delay = self._AVAILABILITY_RETRY_INITIAL_SECONDS
+        while not self._removing and not self._attr_available:
+            await asyncio.sleep(delay)
+            if self._removing:
+                return
+            await self._async_refresh_power_state()
+            delay = min(delay * 2, self._AVAILABILITY_RETRY_MAX_SECONDS)
+
     async def async_will_remove_from_hass(self) -> None:
         self._removing = True
-        tasks = [t for t in (self._command_task, self._startup_task) if t and not t.done()]
+        tasks = [
+            t for t in (self._command_task, self._startup_task, self._retry_task)
+            if t and not t.done()
+        ]
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -142,6 +168,7 @@ class GoveeH617ALight(LightEntity):
                     self._brightness = None
                     self._rgb_color = None
                     self._attr_available = False
+                    self._async_schedule_availability_retry()
                     _LOGGER.warning("H617A command failed: %s", err, exc_info=True)
                     for waiter in active_waiters:
                         if not waiter.done():

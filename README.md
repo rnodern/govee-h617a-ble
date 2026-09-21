@@ -15,7 +15,7 @@ Individual segment editing is not included.
 
 ## Experimental effects
 
-Version 0.3.0 includes 34 captured effects: Sunrise, Sunset, Forest, Aurora,
+Version 0.3.1 includes 34 captured effects: Sunrise, Sunset, Forest, Aurora,
 Lightning-A, Lightning-B, Starry Sky, Spring, Summer, Fall, Winter, Rainbow,
 Fire, Wave, Deep Sea, Karst Cave, Glacier, Gobi Desert, Moonlight, Flower Field,
 Downpour, Sunny, Volcano-A, Volcano-B, Cornfield, Meteor shower, Flying, Tree
@@ -66,10 +66,12 @@ one physical strip. If the strip is absent from Advertisements, move it closer
 to the Home Assistant Bluetooth adapter and power-cycle it, then wait a few
 seconds for a new advertisement.
 
-This version queries power state when it starts. Other state represents commands
-successfully written by Home Assistant, not confirmed device readback. Entering
-an effect clears the reported solid colour and brightness rather than displaying
-stale values. Effect identity is unknown after restart. Physical-button/app state
+This version queries power state when it starts. If the strip is busy—for example,
+because the Govee app is connected—it retries after 15 seconds and then with a
+bounded backoff up to five minutes. Other state represents commands successfully
+written by Home Assistant, not confirmed device readback. Entering an effect
+clears the reported solid colour and brightness rather than displaying stale
+values. Effect identity is unknown after restart. Physical-button/app state
 synchronization, transitions, and individual segments remain future work.
 
 ## Protocol evidence
