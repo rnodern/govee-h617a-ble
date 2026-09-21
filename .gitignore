@@ -3,6 +3,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
-captures/*.pcap
-captures/*.pcapng
-captures/*.att.json
+# BLE captures and reverse-engineering notes remain local only.
+captures/

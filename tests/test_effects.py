@@ -1,15 +1,14 @@
 """Capture integrity and async behaviour tests using a fake HA/BLE boundary."""
 import asyncio
 import importlib.util
-import json
-from pathlib import Path
 import sys
 import types
 import unittest
 from unittest.mock import patch, AsyncMock
 
-ROOT = Path(__file__).parents[1]
-COMPONENT = ROOT / 'custom_components/govee_h617a_ble'
+from pathlib import Path
+
+COMPONENT = Path(__file__).parents[1] / 'custom_components/govee_h617a_ble'
 
 
 def module(name, **attrs):
@@ -79,20 +78,7 @@ scenes = mods['scenes'].SCENE_FRAMES
 protocol = mods['protocol']
 
 
-class CaptureTest(unittest.TestCase):
-    def test_generated_diy_matches_every_captured_transaction(self):
-        transactions = []
-        for name in ('h617a-finger-sketch-segments-03.json', 'h617a-finger-sketch-large-04.json'):
-            transactions.extend(json.loads((ROOT / 'captures' / name).read_text())['transactions'])
-        names = {value: name for name, value in mods['diy'].ANIMATIONS.items()}
-        for transaction in transactions:
-            decoded = dict(transaction['decoded'])
-            decoded['animation'] = names[decoded.pop('effect')]
-            if decoded['background_rgb'] == [1, 1, 1]:
-                decoded['background_rgb'] = None
-            frames = mods['diy'].finger_sketch_frames(**decoded)
-            self.assertEqual([f.hex() for f in frames], [f['hex'] for f in transaction['frames']], transaction['action'])
-
+class ProtocolTest(unittest.TestCase):
     def test_diy_rejects_invalid_or_unverified_patterns(self):
         valid = dict(animation='breathe', speed=50, background_brightness=100,
                      background_rgb=None, groups=[{'rgb':[255,0,0], 'segments':[0]}])
@@ -126,20 +112,20 @@ class CaptureTest(unittest.TestCase):
                 self.assertEqual(upload[0][3], len(upload), name)
                 self.assertEqual([f[1] for f in upload], list(range(len(upload) - 1)) + [255], name)
 
-    def test_all_effects_exactly_match_audited_fixtures(self):
-        for slug, number in [('sunrise',1), ('starry-sky',2), ('fire',4)]:
-            data = json.loads((ROOT / f'captures/h617a-scene-{slug}-session-{number:02}.json').read_text())
-            expected = data.get('multi_packet_scene_data', []) + [data['activation']['payload_hex']]
-            frames = scenes[data['scene']]
-            self.assertEqual([f.hex() for f in frames], expected)
-            self.assertTrue(all(protocol.verify_frame(f) for f in frames))
-            self.assertTrue(frames[-1].startswith(bytes.fromhex('330504')))
-            self.assertFalse(any(f.startswith(bytes.fromhex('3309')) for f in frames))
-            upload = frames[:-1]
-            if upload:
-                self.assertEqual(upload[0][3], len(upload))
-                self.assertEqual([f[1] for f in upload], list(range(len(upload)-1)) + [255])
-        self.assertNotEqual(scenes['Fire'][-2][2:-1], bytes(17))
+    def test_diy_multipart_frames_are_complete_and_checksummed(self):
+        groups = [
+            {'rgb': [index * 17, 255 - index * 17, index * 9], 'segments': [index]}
+            for index in range(15)
+        ]
+        frames = mods['diy'].finger_sketch_frames(
+            animation='clockwise', speed=100, background_brightness=100,
+            background_rgb=None, groups=groups,
+        )
+        self.assertEqual(len(frames), 6)
+        self.assertTrue(all(protocol.verify_frame(frame) for frame in frames))
+        self.assertEqual(frames[0][:4], bytes.fromhex('a3000105'))
+        self.assertEqual([frame[1] for frame in frames[:-1]], [0, 1, 2, 3, 255])
+        self.assertTrue(frames[-1].startswith(bytes.fromhex('33050a20')))
 
 
 class BehaviourTest(unittest.IsolatedAsyncioTestCase):
@@ -173,14 +159,14 @@ class BehaviourTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.calls, [])
 
     async def test_large_diy_uses_one_complete_transaction(self):
-        fixture = json.loads((ROOT / 'captures/h617a-finger-sketch-large-04.json').read_text())
-        transaction = fixture['transactions'][-1]
-        pattern = dict(transaction['decoded'])
-        pattern.pop('effect')
-        pattern.update(animation='clockwise', background_rgb=None)
+        pattern = dict(
+            animation='clockwise', speed=100, background_brightness=100,
+            background_rgb=None,
+            groups=[{'rgb': [index * 17, 255 - index * 17, index * 9], 'segments': [index]} for index in range(15)],
+        )
         await self.light.async_apply_diy(**pattern)
         self.assertEqual(len(self.calls), 1)
-        self.assertEqual([f.hex() for f in self.calls[0]], [f['hex'] for f in transaction['frames']])
+        self.assertEqual(self.calls[0], mods['diy'].finger_sketch_frames(**pattern))
 
     async def test_diy_failure_keeps_previous_saved_pattern(self):
         pattern = dict(animation='breathe', speed=50, background_brightness=100,

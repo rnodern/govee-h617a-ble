@@ -136,10 +136,10 @@ clears the reported solid colour and retains the last selected brightness (full
 brightness if none is known). Effect identity is unknown after restart.
 Physical-button/app state synchronization and transitions remain future work.
 
-## Protocol evidence
+## Protocol development
 
-Captured evidence and notes are kept in `captures/`. Capture files are ignored by
-Git because they include Bluetooth addresses and nearby advertising traffic.
+Bluetooth captures and reverse-engineering notes are kept private. The repository
+contains the implementation and protocol tests, without capture artefacts.
 
 ## Development checks
 
