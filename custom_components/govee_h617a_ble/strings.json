@@ -1,4 +1,17 @@
 {
+  "services": {
+    "apply_diy": {
+      "name": "Apply DIY pattern",
+      "description": "Apply an experimental Finger Sketch pattern to the strip.",
+      "fields": {
+        "animation": {"name": "Animation", "description": "How the painted pattern moves."},
+        "speed": {"name": "Speed", "description": "Animation speed from 0 to 100."},
+        "background_brightness": {"name": "Background brightness", "description": "Background brightness from 1 to 100."},
+        "background_rgb": {"name": "Background colour", "description": "RGB list, or null for no background."},
+        "groups": {"name": "Painted segments", "description": "Colour groups containing RGB and segment indices from 0 to 14."}
+      }
+    }
+  },
   "config": {
     "abort": {
       "not_connectable": "This Bluetooth adapter cannot connect to the strip."

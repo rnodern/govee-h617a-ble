@@ -1,0 +1,35 @@
+apply_diy:
+  name: Apply DIY pattern
+  description: Apply an experimental Finger Sketch pattern in one BLE transaction.
+  target:
+    entity:
+      integration: govee_h617a_ble
+      domain: light
+  fields:
+    animation:
+      required: true
+      selector:
+        select:
+          options: [clockwise, counter_clockwise, cycle, gradient, twinkle, breathe]
+    speed:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+    background_brightness:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 100
+    background_rgb:
+      description: RGB list, or null for no background.
+      required: true
+      selector:
+        object:
+    groups:
+      description: List of rgb and segments objects. Segments are numbered 0–14.
+      required: true
+      selector:
+        object:

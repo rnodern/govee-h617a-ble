@@ -18,6 +18,7 @@ from .const import CONF_ADDRESS, CONF_NAME, DOMAIN, MODEL
 from .controller import GoveeH617AController
 from .protocol import brightness_frame, power_frame, whole_strip_color_frame
 from .scenes import SCENE_FRAMES
+from .diy import DIY_EFFECT, finger_sketch_frames
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class GoveeH617ALight(LightEntity):
 
     _attr_supported_color_modes = {ColorMode.RGB}
     _attr_supported_features = LightEntityFeature.EFFECT
-    _attr_effect_list = [EFFECT_OFF, *SCENE_FRAMES]
+    _attr_effect_list = [EFFECT_OFF, *SCENE_FRAMES, DIY_EFFECT]
     _attr_should_poll = False
     _COMMAND_DEBOUNCE_SECONDS = 0.25
     _AVAILABILITY_RETRY_INITIAL_SECONDS = 15
@@ -44,6 +45,7 @@ class GoveeH617ALight(LightEntity):
         self._brightness: int | None = None
         self._rgb_color: tuple[int, int, int] | None = None
         self._effect: str | None = None
+        self._diy_pattern: dict | None = None
         self._last_solid_rgb = (255, 255, 255)
         self._pending: dict[str, Any] = {}
         self._waiters: list[asyncio.Future[None]] = []
@@ -78,7 +80,22 @@ class GoveeH617ALight(LightEntity):
 
     @property
     def color_mode(self) -> ColorMode:
-        return ColorMode.BRIGHTNESS if self._effect in SCENE_FRAMES else ColorMode.RGB
+        return ColorMode.BRIGHTNESS if self._effect in (*SCENE_FRAMES, DIY_EFFECT) else ColorMode.RGB
+
+    @property
+    def extra_state_attributes(self):
+        return {"diy_pattern": self._diy_pattern} if self._diy_pattern else {}
+
+    async def async_apply_diy(self, **pattern) -> None:
+        """Validate before queueing; use the same serialized path as light actions."""
+        try:
+            frames = finger_sketch_frames(**pattern)
+        except (TypeError, ValueError) as err:
+            raise HomeAssistantError(str(err)) from err
+        await self._queue_command({
+            "power": True, ATTR_EFFECT: DIY_EFFECT,
+            "diy_frames": frames, "diy_pattern": pattern,
+        })
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -137,11 +154,15 @@ class GoveeH617ALight(LightEntity):
         if not changes['power']:
             self._pending.clear()
         if ATTR_EFFECT in changes:
+            self._pending.pop("diy_frames", None)
+            self._pending.pop("diy_pattern", None)
             self._pending.pop(ATTR_RGB_COLOR, None)
             # A new scene owns brightness unless explicitly supplied with it.
             self._pending.pop(ATTR_BRIGHTNESS, None)
         elif ATTR_RGB_COLOR in changes:
             self._pending.pop(ATTR_EFFECT, None)
+            self._pending.pop("diy_frames", None)
+            self._pending.pop("diy_pattern", None)
         self._pending.update(changes)
         waiter = asyncio.get_running_loop().create_future()
         self._waiters.append(waiter)
@@ -199,7 +220,7 @@ class GoveeH617ALight(LightEntity):
                 frames.append(power_frame(True))
             if ATTR_EFFECT in changes and changes[ATTR_EFFECT] != EFFECT_OFF:
                 effect = changes[ATTR_EFFECT]
-                frames.extend(SCENE_FRAMES[effect])
+                frames.extend(changes["diy_frames"] if effect == DIY_EFFECT else SCENE_FRAMES[effect])
                 # The scene upload does not report a brightness value back to
                 # Home Assistant. Preserve the last known value so HA does not
                 # render the effect slider at its minimum; use full brightness
@@ -214,6 +235,8 @@ class GoveeH617ALight(LightEntity):
                 frames.append(brightness_frame(max(1, round(brightness * 100 / 255))))
         if frames:
             await self._controller.async_write_frames(tuple(frames))
+        if "diy_pattern" in changes:
+            self._diy_pattern = changes["diy_pattern"]
         self._is_on, self._effect = on, effect
         self._rgb_color, self._brightness = rgb, brightness
         if rgb is not None and effect == EFFECT_OFF:
@@ -221,6 +244,13 @@ class GoveeH617ALight(LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         effect = kwargs.get(ATTR_EFFECT)
+        if effect == DIY_EFFECT:
+            if self._diy_pattern is None:
+                raise HomeAssistantError("Open the DIY card and apply a pattern first")
+            await self.async_apply_diy(**self._diy_pattern)
+            if ATTR_BRIGHTNESS in kwargs:
+                await self.async_turn_on(brightness=kwargs[ATTR_BRIGHTNESS])
+            return
         if ATTR_EFFECT in kwargs and effect not in self._attr_effect_list:
             raise HomeAssistantError(f"Unsupported H617A effect: {effect}")
         if kwargs.get(ATTR_BRIGHTNESS) == 0:

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Govee DIY card preview</title>
+<style>
+  body {background:#111;color:#eee;font-family:system-ui;margin:32px auto;padding:12px;max-width:560px;
+    --primary-color:#03a9f4;--primary-text-color:#eee;--secondary-text-color:#aaa;--card-background-color:#202124;--divider-color:#555}
+</style>
+<p>Local UI preview · simulated Home Assistant · no Bluetooth commands</p>
+<govee-h617a-card></govee-h617a-card>
+<p id="result" role="status"></p>
+<script src="../www/govee-h617a-card.js"></script>
+<script>
+  window.calls = [];
+  const card = document.querySelector("govee-h617a-card");
+  card.setConfig({entity:"light.test",name:"Study strip"});
+  card.hass = {
+    states: {"light.test":{state:"on",attributes:{friendly_name:"Study strip",effect:"Starry Sky"}}},
+    services:{govee_h617a_ble:{apply_diy:{}}},
+    async callService(domain,service,data) {
+      window.calls.push({domain,service,data});
+      if (window.failNext) { window.failNext=false; throw new Error("Simulated BLE connection failure"); }
+      document.querySelector("#result").textContent = JSON.stringify(data);
+    }
+  };
+</script>
+</html>

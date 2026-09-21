@@ -64,7 +64,7 @@ def load_modules():
     }
     loaded = {}
     with patch.dict(sys.modules, stubs):
-        for name in ('const', 'protocol', 'scenes', 'controller', 'light'):
+        for name in ('const', 'protocol', 'scenes', 'diy', 'controller', 'light'):
             full = 'scene_test_component.' + name
             spec = importlib.util.spec_from_file_location(full, COMPONENT / (name + '.py'))
             m = importlib.util.module_from_spec(spec)
@@ -80,6 +80,33 @@ protocol = mods['protocol']
 
 
 class CaptureTest(unittest.TestCase):
+    def test_generated_diy_matches_every_captured_transaction(self):
+        transactions = []
+        for name in ('h617a-finger-sketch-segments-03.json', 'h617a-finger-sketch-large-04.json'):
+            transactions.extend(json.loads((ROOT / 'captures' / name).read_text())['transactions'])
+        names = {value: name for name, value in mods['diy'].ANIMATIONS.items()}
+        for transaction in transactions:
+            decoded = dict(transaction['decoded'])
+            decoded['animation'] = names[decoded.pop('effect')]
+            if decoded['background_rgb'] == [1, 1, 1]:
+                decoded['background_rgb'] = None
+            frames = mods['diy'].finger_sketch_frames(**decoded)
+            self.assertEqual([f.hex() for f in frames], [f['hex'] for f in transaction['frames']], transaction['action'])
+
+    def test_diy_rejects_invalid_or_unverified_patterns(self):
+        valid = dict(animation='breathe', speed=50, background_brightness=100,
+                     background_rgb=None, groups=[{'rgb':[255,0,0], 'segments':[0]}])
+        invalid = [
+            {'speed':True}, {'speed':101}, {'background_brightness':0},
+            {'animation':'static'}, {'background_rgb':[256,0,0]},
+            {'groups':[]}, {'groups':[{'rgb':[0,0,255], 'segments':[15]}]},
+            {'groups':[{'rgb':[0,0,255], 'segments':[0,0]}]},
+            {'groups':[{'rgb':[i,0,0], 'segments':[i]} for i in range(16)]},
+        ]
+        for changes in invalid:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                mods['diy'].finger_sketch_frames(**(valid | changes))
+
     def test_batch_capture_exposes_every_named_scene(self):
         expected = {
             'Sunrise', 'Sunset', 'Forest', 'Aurora', 'Lightning-A', 'Lightning-B',
@@ -127,6 +154,44 @@ class BehaviourTest(unittest.IsolatedAsyncioTestCase):
         self.light._is_on = True
 
     async def record(self, frames): self.calls.append(frames)
+
+    async def test_diy_apply_is_atomic_and_updates_state_after_success(self):
+        pattern = dict(animation='breathe', speed=50, background_brightness=100,
+                       background_rgb=None, groups=[{'rgb':[255,0,0], 'segments':[0]}])
+        self.light._is_on = False
+        await self.light.async_apply_diy(**pattern)
+        self.assertEqual(self.calls, [(protocol.power_frame(True), *mods['diy'].finger_sketch_frames(**pattern))])
+        self.assertEqual(self.light.effect, 'DIY')
+        self.assertEqual(self.light.extra_state_attributes['diy_pattern'], pattern)
+        self.assertEqual(self.light.color_mode, Modes.BRIGHTNESS)
+        await self.light.async_turn_on(effect='Fire')
+        self.assertEqual(self.calls[-1], scenes['Fire'])
+
+    async def test_invalid_diy_never_connects(self):
+        with self.assertRaises(RuntimeError):
+            await self.light.async_apply_diy(animation='unknown')
+        self.assertEqual(self.calls, [])
+
+    async def test_large_diy_uses_one_complete_transaction(self):
+        fixture = json.loads((ROOT / 'captures/h617a-finger-sketch-large-04.json').read_text())
+        transaction = fixture['transactions'][-1]
+        pattern = dict(transaction['decoded'])
+        pattern.pop('effect')
+        pattern.update(animation='clockwise', background_rgb=None)
+        await self.light.async_apply_diy(**pattern)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual([f.hex() for f in self.calls[0]], [f['hex'] for f in transaction['frames']])
+
+    async def test_diy_failure_keeps_previous_saved_pattern(self):
+        pattern = dict(animation='breathe', speed=50, background_brightness=100,
+                       background_rgb=None, groups=[{'rgb':[255,0,0], 'segments':[0]}])
+        await self.light.async_apply_diy(**pattern)
+        self.controller.async_write_frames.side_effect = ConnectionError('test failure')
+        with self.assertLogs(mods['light']._LOGGER, level='WARNING'):
+            with self.assertRaises(RuntimeError):
+                await self.light.async_apply_diy(**(pattern | {'speed':100}))
+        self.assertEqual(self.light._diy_pattern, pattern)
+        await self.light.async_will_remove_from_hass()
 
     async def test_effect_ignores_stale_rgb_and_brightness(self):
         await self.light.async_turn_on(rgb_color=(255,0,0), brightness=50)

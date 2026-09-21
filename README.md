@@ -3,7 +3,8 @@
 A local Home Assistant custom integration for the Govee H617A RGBIC LED strip.
 
 The integration uses Bluetooth Low Energy directly. It exposes one `light` entity
-with power, brightness, and RGB colour controls. No Govee cloud account or API key
+with power, brightness, RGB colour controls, and 34 captured effects. An optional
+dashboard card adds a DIY Finger Sketch editor. No Govee cloud account or API key
 is required.
 
 ## Current status
@@ -11,7 +12,7 @@ is required.
 The H617A protocol was captured from the iOS Govee app and replayed successfully
 on the development strip. Power, RGB, brightness, and effects work locally;
 state shown after a command is still write-confirmed rather than device readback.
-Individual segment editing is not included.
+The DIY editor supports painting the strip's 15 segments.
 
 ## Experimental effects
 
@@ -43,6 +44,67 @@ data:
 
 ## Installation during development
 
+### DIY editor preview (0.4.0b2)
+
+The optional companion card has a **DIY** button that opens a touch-friendly
+Finger Sketch editor: 15 segments, pencil/eraser, undo, background colour or
+None, background brightness, six animation types, and speed. Draw first, then
+press **Apply to strip** to send one complete pattern. Light controls opens HA's
+normal light popup. This does not change the standard popup elsewhere in HA.
+
+The generated encoder matches all 31 controlled capture transactions exactly,
+including patterns with a different colour on each of the 15 segments. Both
+small patterns and larger multicolour uploads have been tested successfully
+on the development H617A. Other devices and firmware versions still need
+community testing. Uploads use two to five frames in one connection.
+At least one painted segment is required. Background brightness supports
+1–100; speed supports 0–100.
+
+To install:
+
+1. Update the integration folder and restart Home Assistant.
+2. Copy `www/govee-h617a-card.js` to `/config/www/govee-h617a-card.js`.
+   The preview ZIP contains both directories and can be extracted to /config.
+3. Add dashboard resource `/local/govee-h617a-card.js?v=0.4.0b2`, type
+   **JavaScript module** (Settings → Dashboards → Resources; enable Advanced
+   mode in your profile if the Resources menu is hidden).
+4. Add a Manual dashboard card using your actual light entity ID:
+
+```yaml
+type: custom:govee-h617a-card
+entity: light.your_h617a
+name: Study strip
+```
+
+The editor is an in-memory draft; closing and reopening it keeps unsent edits,
+but refreshing the browser discards them. The integration exposes the last
+successfully sent DIY pattern as an entity attribute, not device readback.
+That pattern is not restored after an HA restart. Named preset saving and
+replacement of the standard more-info popup are not part of this preview.
+Close the Govee app before applying a pattern.
+
+The same action is available to automations:
+
+```yaml
+action: govee_h617a_ble.apply_diy
+target:
+  entity_id: light.your_h617a
+data:
+  animation: clockwise
+  speed: 0
+  background_brightness: 100
+  background_rgb: null
+  groups:
+    - rgb: [0, 0, 255]
+      segments: [1]
+    - rgb: [0, 255, 0]
+      segments: [14]
+```
+
+Segment numbers in actions are zero-based; the editor displays 1–15.
+
+### Integration
+
 Copy `custom_components/govee_h617a_ble` to the same path inside your Home
 Assistant configuration directory, restart Home Assistant, then add **Govee H617A
 BLE** from Settings → Devices & services.
@@ -72,8 +134,7 @@ bounded backoff up to five minutes. Other state represents commands successfully
 written by Home Assistant, not confirmed device readback. Entering an effect
 clears the reported solid colour and retains the last selected brightness (full
 brightness if none is known). Effect identity is unknown after restart.
-Physical-button/app state synchronization, transitions, and individual segments
-remain future work.
+Physical-button/app state synchronization and transitions remain future work.
 
 ## Protocol evidence
 
